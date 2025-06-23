@@ -1,146 +1,204 @@
-# Server/server.py
 import socket
 import threading
+import random
+import string
 import sys
 import signal
 import atexit
 from pyngrok import ngrok
+from network import create_tunnel
 
-class CyberChatServer:
-    def __init__(self):
-        self.port = int(input("[?] Enter port to bind the server: "))
-        self.host = '0.0.0.0'
-        self.server_socket = None
-        self.clients = []  # list of client sockets
-        self.client_names = {}  # mapping client socket to name
-        self.running = False
-        self.ngrok_tunnel = None
+# ========================
+# Global Variables
+# ========================
+clients = []  # (socket, address, is_admin, username)
+banned_ips = set()
+CMD_PREFIX = "::"
+server_running = True
+ADMIN_TOKEN = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
+admin_ip = None
+ngrok_url = None
 
-        # Cleanup handlers
-        atexit.register(self.nuke)
-        signal.signal(signal.SIGTERM, self.handle_shutdown)
-        signal.signal(signal.SIGINT, self.handle_shutdown)
+# ========================
+# Cleanup and Signal Handling
+# ========================
+def handle_shutdown(signum=None, frame=None):
+    print("\n[!] Shutdown signal received. Cleaning up...")
+    shutdown_server()
+    sys.exit(0)
 
-    def handle_shutdown(self, signum, frame):
-        """Handle graceful shutdown"""
-        print(f"\n[!] Received shutdown signal ({signum})")
-        self.nuke()
-        sys.exit(0)
-
-    def nuke(self):
-        """Destroy all server artifacts"""
-        print("[*] Nuking server...")
-        self.stop_ngrok()
-        self.stop_server()
-        print("[+] System clean")
-
-    def stop_ngrok(self):
-        if self.ngrok_tunnel:
-            ngrok.disconnect(self.ngrok_tunnel.public_url)
-            self.ngrok_tunnel = None
-
-    def start_ngrok(self):
+def shutdown_server():
+    global server_running
+    server_running = False
+    try:
+        if ngrok_url:
+            ngrok.disconnect(ngrok_url)
+    except:
+        pass
+    for client, _, _, _ in clients:
         try:
-            self.ngrok_tunnel = ngrok.connect(self.port, "tcp")
-            return self.ngrok_tunnel.public_url
-        except Exception as e:
-            print(f"[!] Ngrok error: {e}")
-            return None
-
-    def setup_server_socket(self):
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(5)
-        self.running = True
-        print(f"[+] Server socket bound to {self.host}:{self.port}")
-
-    def broadcast(self, message, sender_socket=None):
-        """Send message to all clients except the sender"""
-        for client in self.clients:
-            if client != sender_socket:
-                try:
-                    client.send(message.encode())
-                except:
-                    # Remove dead client
-                    self.remove_client(client)
-
-    def remove_client(self, client_socket):
-        if client_socket in self.clients:
-            self.clients.remove(client_socket)
-        name = self.client_names.pop(client_socket, None)
-        if name:
-            print(f"[-] {name} disconnected")
-            self.broadcast(f"[-] {name} left the chat", None)
-
-    def handle_client(self, client_socket):
-        try:
-            client_socket.send("Enter your name: ".encode())
-            name = client_socket.recv(1024).decode().strip()
-            self.client_names[client_socket] = name
-            self.broadcast(f"[+] {name} joined the chat", client_socket)
-
-            while self.running:
-                message = client_socket.recv(1024).decode()
-                if not message:
-                    break
-                full_message = f"{name}: {message}"
-                self.broadcast(full_message, client_socket)
+            client.send("[Server] Server shutting down. Goodbye!\n".encode())
+            client.close()
         except:
             pass
-        finally:
-            client_socket.close()
-            self.remove_client(client_socket)
+    print("[+] All connections closed. Server clean.")
 
-    def start(self):
-        """Start the chat server"""
+atexit.register(shutdown_server)
+signal.signal(signal.SIGINT, handle_shutdown)
+signal.signal(signal.SIGTERM, handle_shutdown)
+
+# ========================
+# Broadcast Helper
+# ========================
+def broadcast(msg, sender_socket=None):
+    for client, _, _, _ in clients:
+        if client != sender_socket:
+            try:
+                client.send(msg.encode())
+            except:
+                remove_client(client)
+
+# ========================
+# Remove client helper
+# ========================
+def remove_client(sock):
+    global clients
+    clients = [c for c in clients if c[0] != sock]
+    print(f"[STATUS] Active connections: {len(clients)}")
+
+# ========================
+# Handle admin commands
+# ========================
+def handle_admin_command(command, client_socket, addr):
+    is_admin = any(sock == client_socket and admin_status for sock, _, admin_status, _ in clients)
+
+    if not is_admin:
+        client_socket.send("[Server] Admin privileges required.\n".encode())
+        return
+
+    cmd = command.strip().split()
+    if not cmd:
+        return
+
+    if cmd[0] == "::ban" and len(cmd) == 2:
+        banned_ips.add(cmd[1])
+        broadcast(f"[Server] IP {cmd[1]} banned by admin.")
+    elif cmd[0] == "::warn" and len(cmd) >= 3:
+        warning = " ".join(cmd[2:])
+        for sock, ip, _, _ in clients:
+            if ip[0] == cmd[1]:
+                sock.send(f"[Admin Warning] {warning}\n".encode())
+    elif cmd[0] == "::kick" and len(cmd) == 2:
+        for sock, ip, _, name in clients:
+            if ip[0] == cmd[1]:
+                sock.send("[Server] You were kicked by admin.\n".encode())
+                sock.close()
+                remove_client(sock)
+                broadcast(f"[Server] {name} was kicked.")
+    elif cmd[0] == "::clear":
+        broadcast("[Server] Chat cleared by admin.\n")
+    elif cmd[0] == "::users":
+        users = "\n".join([f"- {name} ({ip[0]})" for _, ip, _, name in clients])
+        client_socket.send(f"[Server] Users:\n{users}\n".encode())
+    elif cmd[0] == "::help":
+        help_text = """
+[Server] Admin Commands:
+  ::ban <ip>     - Ban a user's IP
+  ::kick <ip>    - Kick a user
+  ::warn <ip> <msg> - Send a warning message
+  ::clear        - Clear chat for all
+  ::users        - List connected users
+"""
+        client_socket.send(help_text.encode())
+    else:
+        client_socket.send("[Server] Unknown admin command. Use ::help\n".encode())
+
+# ========================
+# Handle Client
+# ========================
+def handle_client(sock, addr):
+    global admin_ip
+    is_admin = False
+    username = f"User-{addr[1]}"
+
+    # Token Authentication
+    if admin_ip is None:
         try:
-            self.setup_server_socket()
-            public_url = self.start_ngrok()
-            if public_url:
-                print(f"\n[+] Server LIVE at {public_url}")
-            print(f"[*] Server started on {self.host}:{self.port}")
-            print("[*] Press Ctrl+C to shutdown\n")
+            sock.send("[Server] Enter admin token: ".encode())
+            attempt = sock.recv(1024).decode().strip()
+            if attempt == ADMIN_TOKEN:
+                admin_ip = addr[0]
+                is_admin = True
+                username = f"Admin-{addr[1]}"
+                sock.send("[Server] Admin access granted.\n".encode())
+            else:
+                sock.send("[Server] Invalid token. Continuing as normal user.\n".encode())
+        except:
+            sock.send("[Server] Error with token input. Proceeding as user.\n".encode())
+    else:
+        sock.send("[Server] Admin already authenticated.\n".encode())
 
-            # Start a thread to accept clients
-            accept_thread = threading.Thread(target=self.accept_clients, daemon=True)
-            accept_thread.start()
-            accept_thread.join()  # Wait for the thread to finish (which is when server shuts down)
+    clients.append((sock, addr, is_admin, username))
+    sock.send(f"[Server] Welcome {username}. Type '{CMD_PREFIX}help' for commands.\n".encode())
 
-        except KeyboardInterrupt:
-            print("\n[!] Manual shutdown initiated")
-            self.nuke()
-        except Exception as e:
-            print(f"[!] Critical server error: {e}")
-            self.nuke()
-            sys.exit(1)
-
-    def accept_clients(self):
-        while self.running:
-            try:
-                client_socket, addr = self.server_socket.accept()
-                print(f"[+] New connection: {addr[0]}:{addr[1]}")
-                self.clients.append(client_socket)
-                client_thread = threading.Thread(target=self.handle_client, args=(client_socket,), daemon=True)
-                client_thread.start()
-            except OSError:
-                # Server socket closed
+    while server_running:
+        try:
+            msg = sock.recv(1024).decode()
+            if not msg:
                 break
+            if msg.startswith(CMD_PREFIX):
+                handle_admin_command(msg, sock, addr)
+            else:
+                broadcast(f"[{username}] {msg}", sock)
+        except:
+            break
 
-    def stop_server(self):
-        self.running = False
-        if self.server_socket:
-            try:
-                self.server_socket.close()
-            except:
-                pass
-        for client in self.clients:
-            try:
-                client.close()
-            except:
-                pass
-        self.clients = []
-        self.client_names = {}
+    print(f"[-] {username} disconnected.")
+    sock.close()
+    remove_client(sock)
 
-if __name__ == "__main__":
-    server = CyberChatServer()
-    server.start()
+# ========================
+# Start Server
+# ========================
+def start_server(port):
+    global ngrok_url
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(('0.0.0.0', port))
+    server.listen()
+    print(f"[+] Server listening on port {port}")
+    print(f"[TOKEN] Admin Token: {ADMIN_TOKEN} (Save this!)")
+
+    if input("Use ngrok? (y/n): ").lower() == 'y':
+        token = input("Enter your ngrok authtoken: ").strip()
+        ngrok.set_auth_token(token)
+        tunnel = ngrok.connect(port, "tcp")
+        ngrok_url = tunnel.public_url
+        print(f"[NGROK] Public URL: {ngrok_url.replace('tcp://', '')}")
+
+    print("[*] Waiting for clients...")
+    while server_running:
+        try:
+            client_sock, addr = server.accept()
+            if addr[0] in banned_ips:
+                client_sock.send("[Server] You're banned.\n".encode())
+                client_sock.close()
+                continue
+            threading.Thread(target=handle_client, args=(client_sock, addr), daemon=True).start()
+        except:
+            break
+
+    server.close()
+
+# ========================
+# Entry Point
+# ========================
+if __name__ == '__main__':
+    print("\n====== RealityPatch Server V1 ======")
+    try:
+        port = int(input("Enter port to run server on: "))
+        start_server(port)
+    except KeyboardInterrupt:
+        handle_shutdown()
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        handle_shutdown()
