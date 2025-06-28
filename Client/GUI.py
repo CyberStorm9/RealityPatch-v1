@@ -1,34 +1,61 @@
-# GUI.py
+# gui.py
+import sys
+
+# Check availability of frameworks
+PYQT_AVAILABLE = False
+TKINTER_AVAILABLE = False
+TEXTUAL_AVAILABLE = False
+RICH_AVAILABLE = False
+
+# ========== CHECK FOR LIBRARIES ==========
 try:
-    from PyQt6.QtWidgets import (
-        QApplication, QMainWindow, QTextEdit, QLineEdit, QVBoxLayout, QWidget
-    )
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QTextEdit, QLineEdit, QVBoxLayout, QWidget
     from PyQt6.QtGui import QFont, QColor, QTextCharFormat
     from PyQt6.QtCore import Qt, pyqtSignal, QObject
-    GUI_MODE = "pyqt6"
+    PYQT_AVAILABLE = True
 except ImportError:
-    try:
-        import tkinter as tk
-        from tkinter import scrolledtext
-        GUI_MODE = "tkinter"
-    except ImportError:
-        GUI_MODE = "terminal"
+    pass
+
+try:
+    import tkinter as tk
+    from tkinter import scrolledtext
+    TKINTER_AVAILABLE = True
+except ImportError:
+    pass
+
+try:
+    from textual.app import App
+    from textual.containers import Container
+    from textual.widgets import Header, Footer, Input, Static
+    TEXTUAL_AVAILABLE = True
+except ImportError:
+    pass
+
+try:
+    from rich.console import Console
+    from rich.text import Text
+    RICH_AVAILABLE = True
+except ImportError:
+    pass
 
 
-# ===== PyQt6 GUI =====
-if GUI_MODE == "pyqt6":
+# ==========================================
+# ===            GUI CLASSES             ===
+# ==========================================
+
+# ---------------- PYQT ----------------
+if PYQT_AVAILABLE:
     class Communicator(QObject):
         message_signal = pyqtSignal(str, str)
 
-
-    class CyberChatClientGUI(QMainWindow):
-        def __init__(self, communicator):
+    class CyberChatPyQt(QMainWindow):
+        def __init__(self, comm):
             super().__init__()
-            self.setWindowTitle("RealityPatch V1 - CyberChat")
+            self.setWindowTitle("RealityPatch - CyberChat")
             self.setGeometry(100, 100, 800, 600)
-            self.setStyleSheet("background-color: #0d0d0d; color: #00ff00;")
+            self.setStyleSheet("background-color: #000000; color: #00FF00;")
 
-            self.comm = communicator
+            self.comm = comm
             self.comm.message_signal.connect(self.display_message)
             self.init_ui()
 
@@ -38,7 +65,7 @@ if GUI_MODE == "pyqt6":
             self.chat_display.setFont(QFont("Courier New", 12))
 
             self.input_field = QLineEdit()
-            self.input_field.setPlaceholderText("Enter message...")
+            self.input_field.setPlaceholderText("Type your message...")
             self.input_field.returnPressed.connect(self.handle_input)
 
             layout = QVBoxLayout()
@@ -50,75 +77,157 @@ if GUI_MODE == "pyqt6":
             self.setCentralWidget(container)
 
         def handle_input(self):
-            message = self.input_field.text().strip()
-            if message:
-                self.comm.message_signal.emit("You", message)
+            msg = self.input_field.text()
+            if msg:
+                self.comm.message_signal.emit("You", msg)
                 self.input_field.clear()
 
         def display_message(self, sender, message):
             cursor = self.chat_display.textCursor()
 
             sender_fmt = QTextCharFormat()
-            sender_fmt.setForeground(QColor("#00ffff"))
+            sender_fmt.setForeground(QColor("#00FFFF"))
             sender_fmt.setFontWeight(75)
 
             msg_fmt = QTextCharFormat()
-            msg_fmt.setForeground(QColor("#ffffff"))
+            msg_fmt.setForeground(QColor("#FFFFFF"))
 
             cursor.insertText(f"{sender}: ", sender_fmt)
             cursor.insertText(f"{message}\n", msg_fmt)
             self.chat_display.ensureCursorVisible()
 
-# ===== Tkinter GUI =====
-elif GUI_MODE == "tkinter":
-    class Communicator:
-        """Basic communicator for Tkinter"""
-        def __init__(self):
-            self.message_signal = None
 
-
-    class CyberChatTkinterGUI:
-        def __init__(self, communicator):
-            self.comm = communicator
+# ---------------- TKINTER ----------------
+if TKINTER_AVAILABLE:
+    class CyberChatTkinter:
+        def __init__(self, send_callback):
+            self.send_callback = send_callback
             self.root = tk.Tk()
-            self.root.title("RealityPatch - CyberChat (Tkinter Fallback)")
-            self.root.configure(bg="#0d0d0d")
+            self.root.title("RealityPatch - CyberChat")
+            self.root.configure(bg="black")
 
-            self.chat_display = scrolledtext.ScrolledText(
-                self.root, bg="#1a1a1a", fg="#00ff00", font=("Courier", 12)
+            self.chat_box = scrolledtext.ScrolledText(
+                self.root, bg="black", fg="#00FF00", font=("Courier", 12)
             )
-            self.chat_display.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-            self.chat_display.config(state=tk.DISABLED)
+            self.chat_box.pack(expand=True, fill="both")
+            self.chat_box.config(state="disabled")
 
             self.input_field = tk.Entry(
-                self.root, bg="#333333", fg="#00ff00", font=("Courier", 12)
+                self.root, bg="black", fg="#00FF00", font=("Courier", 12)
             )
-            self.input_field.pack(padx=10, pady=10, fill=tk.X)
+            self.input_field.pack(fill="x")
             self.input_field.bind("<Return>", self.handle_input)
 
-            self.comm.message_signal = self.display_message
-
-        def handle_input(self, event=None):
-            message = self.input_field.get().strip()
-            if message:
-                self.comm.message_signal("You", message)
+        def handle_input(self, event):
+            msg = self.input_field.get()
+            if msg:
+                self.send_callback("You", msg)
                 self.input_field.delete(0, tk.END)
 
         def display_message(self, sender, message):
-            self.chat_display.config(state=tk.NORMAL)
-            self.chat_display.insert(tk.END, f"{sender}: {message}\n")
-            self.chat_display.yview(tk.END)
-            self.chat_display.config(state=tk.DISABLED)
+            self.chat_box.config(state="normal")
+            self.chat_box.insert(tk.END, f"{sender}: {message}\n")
+            self.chat_box.config(state="disabled")
+            self.chat_box.see(tk.END)
 
         def run(self):
             self.root.mainloop()
 
 
-# ===== Terminal Mode Placeholder =====
-else:
-    class Communicator:
-        """Dummy communicator for terminal mode"""
-        def __init__(self):
-            self.message_signal = None
+# ---------------- TEXTUAL ----------------
+if TEXTUAL_AVAILABLE:
+    class CyberChatTextual(App):
+        CSS_PATH = None
 
-    # Terminal mode handled directly in client.py
+        def __init__(self, send_callback):
+            super().__init__()
+            self.send_callback = send_callback
+            self.chat_log = ""
+        
+        def compose(self):
+            yield Header()
+            yield Container(Static("RealityPatch - CyberChat", id="title"))
+            yield Container(Static("", id="chat_log"))
+            yield Input(placeholder="Type a message...", id="input")
+            yield Footer()
+
+        def on_input_submitted(self, event):
+            message = event.value
+            if message:
+                self.query_one("#input").value = ""
+                self.send_callback("You", message)
+
+        def display_message(self, sender, message):
+            chat_log = self.query_one("#chat_log")
+            self.chat_log += f"\n{sender}: {message}"
+            chat_log.update(self.chat_log)
+
+
+# ---------------- RICH ----------------
+if RICH_AVAILABLE:
+    class CyberChatRich:
+        def __init__(self):
+            self.console = Console()
+
+        def display_message(self, sender, message):
+            text = Text(f"{sender}: {message}", style="bold green")
+            self.console.print(text)
+
+        def input_loop(self, send_callback):
+            try:
+                while True:
+                    msg = input(">>> ")
+                    if msg:
+                        send_callback("You", msg)
+            except KeyboardInterrupt:
+                print("\n[!] Chat closed")
+
+
+# ---------------- DEFAULT ----------------
+class CyberChatDefault:
+    def display_message(self, sender, message):
+        print(f"{sender}: {message}")
+
+    def input_loop(self, send_callback):
+        try:
+            while True:
+                msg = input(">>> ")
+                if msg:
+                    send_callback("You", msg)
+        except KeyboardInterrupt:
+            print("\n[!] Chat closed")
+
+
+# ==========================================
+# ===         MASTER LAUNCHER            ===
+# ==========================================
+
+def launch_gui(send_callback):
+    if PYQT_AVAILABLE:
+        print("[*] Launching PyQt6 GUI...")
+        comm = Communicator()
+        app = QApplication(sys.argv)
+        window = CyberChatPyQt(comm)
+        window.show()
+        comm.message_signal.connect(lambda s, m: window.display_message(s, m))
+        sys.exit(app.exec())
+
+    elif TKINTER_AVAILABLE:
+        print("[*] Launching Tkinter GUI...")
+        gui = CyberChatTkinter(send_callback)
+        gui.run()
+
+    elif TEXTUAL_AVAILABLE:
+        print("[*] Launching Textual TUI...")
+        gui = CyberChatTextual(send_callback)
+        gui.run()
+
+    elif RICH_AVAILABLE:
+        print("[*] Launching Rich Terminal UI...")
+        gui = CyberChatRich()
+        gui.input_loop(send_callback)
+
+    else:
+        print("[*] No GUI frameworks found. Falling back to DEFAULT TEXT MODE.")
+        gui = CyberChatDefault()
+        gui.input_loop(send_callback)
