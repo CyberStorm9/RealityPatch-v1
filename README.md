@@ -35,5 +35,15 @@ This is a fully self-destructing chat server and client. When the server dies, i
 git clone https://github.com/CyberStorm9/RealityPatch-v1.git
 ### 🔥 Server Side  
 
-cd RealityPatchV1/Server
+cd RealityPatch-v1/Server
+python install.py
+
+
+### 🔥 Server Side  
+
+```bash
+git clone https://github.com/CyberStorm9/RealityPatch-v1.git
+### 🔥 Client Side  
+
+cd RealityPatch-v1/Client 
 python install.py
