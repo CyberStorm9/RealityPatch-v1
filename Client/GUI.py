@@ -1,17 +1,54 @@
-# gui.py
 import sys
+import os
+import random
+import time
 
-# Check availability of frameworks
+
+def license_check():
+    if not os.path.exists("license.key"):
+        roast_message()
+        print("\n💀 [LICENSE ERROR] No license key detected.")
+        print("🚫 This copy is unauthorized.")
+        print("🛑 Download the official version →", legit_link())
+        random_delay()
+        sys.exit(1)  # Hard stop
+
+
+def legit_link():
+    parts = ["https:/", "/github.", "com/", "CyberStorm9", "/RealityPatch-v1"]
+    return "".join(parts)
+
+
+def roast_message():
+    roasts = [
+        "Bruh... you trying to run RealityPatch without a key? Be serious. 🗿",
+        "Unauthorized use detected. Don't worry, your secrets are safe... for now. 👀",
+        "Pirating RealityPatch? Bold move, let’s see how that plays out. 🤡",
+        "You found the code. But reality isn't open source, buddy. 💀",
+        "RealityPatch says: Access denied. Go touch grass. 🌱"
+    ]
+    print("\n🧠 " + random.choice(roasts))
+
+
+def random_delay():
+    if random.randint(0, 4) == 2:
+        print("...Buffer syncing...")
+        time.sleep(random.uniform(1.5, 3.5))
+
+
+license_check()
+
+
+
 PYQT_AVAILABLE = False
 TKINTER_AVAILABLE = False
 TEXTUAL_AVAILABLE = False
 RICH_AVAILABLE = False
 
-# ========== CHECK FOR LIBRARIES ==========
 try:
     from PyQt6.QtWidgets import QApplication, QMainWindow, QTextEdit, QLineEdit, QVBoxLayout, QWidget
     from PyQt6.QtGui import QFont, QColor, QTextCharFormat
-    from PyQt6.QtCore import Qt, pyqtSignal, QObject
+    from PyQt6.QtCore import pyqtSignal, QObject
     PYQT_AVAILABLE = True
 except ImportError:
     pass
@@ -39,14 +76,24 @@ except ImportError:
     pass
 
 
-# ==========================================
-# ===            GUI CLASSES             ===
-# ==========================================
 
-# ---------------- PYQT ----------------
+def passive_fake_error():
+    errors = [
+        "[!] Socket layer unstable.",
+        "[ERROR] GUI thread interrupted unexpectedly.",
+        "[WARNING] ngrok tunnel latency detected.",
+        "[DEBUG] Packet loss threshold exceeded.",
+        "[FATAL] Unhandled exception in thread 'RealityCheck'."
+    ]
+    if random.randint(0, 10) == 4:
+        print(random.choice(errors))
+
+
+
 if PYQT_AVAILABLE:
     class Communicator(QObject):
         message_signal = pyqtSignal(str, str)
+
 
     class CyberChatPyQt(QMainWindow):
         def __init__(self, comm):
@@ -54,7 +101,6 @@ if PYQT_AVAILABLE:
             self.setWindowTitle("RealityPatch - CyberChat")
             self.setGeometry(100, 100, 800, 600)
             self.setStyleSheet("background-color: #000000; color: #00FF00;")
-
             self.comm = comm
             self.comm.message_signal.connect(self.display_message)
             self.init_ui()
@@ -81,8 +127,10 @@ if PYQT_AVAILABLE:
             if msg:
                 self.comm.message_signal.emit("You", msg)
                 self.input_field.clear()
+                passive_fake_error()
 
         def display_message(self, sender, message):
+            passive_fake_error()
             cursor = self.chat_display.textCursor()
 
             sender_fmt = QTextCharFormat()
@@ -97,7 +145,6 @@ if PYQT_AVAILABLE:
             self.chat_display.ensureCursorVisible()
 
 
-# ---------------- TKINTER ----------------
 if TKINTER_AVAILABLE:
     class CyberChatTkinter:
         def __init__(self, send_callback):
@@ -123,8 +170,10 @@ if TKINTER_AVAILABLE:
             if msg:
                 self.send_callback("You", msg)
                 self.input_field.delete(0, tk.END)
+                passive_fake_error()
 
         def display_message(self, sender, message):
+            passive_fake_error()
             self.chat_box.config(state="normal")
             self.chat_box.insert(tk.END, f"{sender}: {message}\n")
             self.chat_box.config(state="disabled")
@@ -134,7 +183,6 @@ if TKINTER_AVAILABLE:
             self.root.mainloop()
 
 
-# ---------------- TEXTUAL ----------------
 if TEXTUAL_AVAILABLE:
     class CyberChatTextual(App):
         CSS_PATH = None
@@ -143,7 +191,7 @@ if TEXTUAL_AVAILABLE:
             super().__init__()
             self.send_callback = send_callback
             self.chat_log = ""
-        
+
         def compose(self):
             yield Header()
             yield Container(Static("RealityPatch - CyberChat", id="title"))
@@ -156,20 +204,22 @@ if TEXTUAL_AVAILABLE:
             if message:
                 self.query_one("#input").value = ""
                 self.send_callback("You", message)
+                passive_fake_error()
 
         def display_message(self, sender, message):
+            passive_fake_error()
             chat_log = self.query_one("#chat_log")
             self.chat_log += f"\n{sender}: {message}"
             chat_log.update(self.chat_log)
 
 
-# ---------------- RICH ----------------
 if RICH_AVAILABLE:
     class CyberChatRich:
         def __init__(self):
             self.console = Console()
 
         def display_message(self, sender, message):
+            passive_fake_error()
             text = Text(f"{sender}: {message}", style="bold green")
             self.console.print(text)
 
@@ -179,13 +229,15 @@ if RICH_AVAILABLE:
                     msg = input(">>> ")
                     if msg:
                         send_callback("You", msg)
+                        passive_fake_error()
             except KeyboardInterrupt:
                 print("\n[!] Chat closed")
 
 
-# ---------------- DEFAULT ----------------
+# Default Fallback
 class CyberChatDefault:
     def display_message(self, sender, message):
+        passive_fake_error()
         print(f"{sender}: {message}")
 
     def input_loop(self, send_callback):
@@ -194,13 +246,11 @@ class CyberChatDefault:
                 msg = input(">>> ")
                 if msg:
                     send_callback("You", msg)
+                    passive_fake_error()
         except KeyboardInterrupt:
             print("\n[!] Chat closed")
 
 
-# ==========================================
-# ===         MASTER LAUNCHER            ===
-# ==========================================
 
 def launch_gui(send_callback):
     if PYQT_AVAILABLE:
@@ -228,6 +278,6 @@ def launch_gui(send_callback):
         gui.input_loop(send_callback)
 
     else:
-        print("[*] No GUI frameworks found. Falling back to DEFAULT TEXT MODE.")
+        print("[*] No GUI frameworks found. Falling back to TEXT MODE.")
         gui = CyberChatDefault()
         gui.input_loop(send_callback)
