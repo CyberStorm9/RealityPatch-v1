@@ -17,6 +17,16 @@ REQUIREMENTS = [
 ]
 
 # ==========================
+# Global Port Variable
+# ==========================
+port = input(Fore.CYAN + "\n[*] Enter the TCP port you want the server to use (default 5000): ").strip()
+if not port.isdigit() or int(port) <= 0 or int(port) > 65535:
+    print(Fore.RED + "[!] Invalid port number. Defaulting to 5000.")
+    port = "5000"
+if port == "":
+    port = "5000"
+
+# ==========================
 # Install Python Dependencies
 # ==========================
 def run_command(cmd):
@@ -45,7 +55,7 @@ def setup_ngrok():
         print(Fore.RED + "  ✘ ngrok not found on this system.")
         print(Fore.YELLOW + "  → Download it from: https://ngrok.com/download")
         print(Fore.YELLOW + "  → Unzip it and place it in a directory in your PATH")
-        print(Fore.YELLOW + "  → Or simply place ngrok.exe next to this script")
+        print(Fore.YELLOW + "  → Or simply place ngrok next to this script")
     else:
         print(Fore.GREEN + "  ✔ ngrok is installed and ready.")
 
@@ -60,8 +70,8 @@ def setup_firewall():
     platform = sys.platform
 
     if platform.startswith("linux"):
-        print(Fore.YELLOW + "  ├─ Allowing TCP port 5000 via ufw (if installed)...")
-        run_command("sudo ufw allow 5000/tcp")
+        print(Fore.YELLOW + f"  ├─ Allowing TCP port {port} via ufw (if installed)...")
+        run_command(f"sudo ufw allow {port}/tcp")
     elif platform == "darwin":
         print(Fore.YELLOW + "  ├─ macOS detected. Configure firewall manually if needed.")
     elif platform == "win32":
@@ -75,7 +85,8 @@ def setup_firewall():
 def summary():
     print(Fore.MAGENTA + "\n[+] Setup complete.")
     print(Fore.GREEN + "[*] Run the server with:")
-    print(Fore.YELLOW + "    python server.py")
+    print(Fore.YELLOW + f"    python server.py")
+    print(Fore.CYAN + f"[*] Server will listen on TCP port {port}.")
     print(Fore.CYAN + "[*] You'll be prompted to enter your ngrok auth token at runtime if not set.")
 
 # ==========================
