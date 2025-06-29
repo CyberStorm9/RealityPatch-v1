@@ -2,7 +2,7 @@
 Terminal based communication tool 
 # ⚡ RealityPatch V1 – CyberChat  
 
-Welcome to the **RealityPatch V1 – CyberChat**, a privacy-focused, terminal-based chat app for hackers, truth seekers, rebels, and anyone who doesn't want Big Brother breathing down their neck.  
+ **RealityPatch V1 – CyberChat**, a privacy-focused, terminal-based chat app for hackers, web devs, enthusiasts, and anyone who doesn't want Big Brother breathing down their neck.  
 
 This is a fully self-destructing chat server and client. When the server dies, it nukes the logs. No footprints. No evidence. No compromises.  
 
@@ -33,17 +33,17 @@ This is a fully self-destructing chat server and client. When the server dies, i
 
 ```bash
 git clone https://github.com/CyberStorm9/RealityPatch-v1.git
-### 🔥 Server Side  
+#### 🔥 Server Side  
 
 cd RealityPatch-v1/Server
 python install.py
 
 
-## 🔥 Client Side  
+### 🔥 Client Side  
 
 ```bash
 git clone https://github.com/CyberStorm9/RealityPatch-v1.git
-### 🔥 Client Side  
+#### 🔥 Client Side  
 
 cd RealityPatch-v1/Client 
 python install.py
