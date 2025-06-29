@@ -1,8 +1,20 @@
-# network.py
-
 import socket
 import threading
+import os
 
+
+def part_a(): return "".join([chr(c) for c in [76, 105, 99]])  # 'Lic'
+def part_b(): return "ense"
+def part_c(): return ".key"
+
+def error_prefix(): return "⚠️ "
+def error_mid(): return "Unauthorized usage detected."
+def error_suffix(): return " Get it legally at: https://github.com/YourRepo"
+
+def assemble_license_file(): return part_a() + part_b() + part_c()
+
+def deploy_roast():
+    print(error_prefix() + error_mid() + error_suffix())
 
 class NetworkClient:
     """
@@ -14,6 +26,12 @@ class NetworkClient:
         self.port = port
         self.socket = None
         self.running = False
+        self._integrity_check()
+
+    def _integrity_check(self):
+        if not os.path.exists(assemble_license_file()):
+            deploy_roast()
+            exit()
 
     def connect(self):
         try:
